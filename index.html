@@ -1,1 +1,98 @@
-sdasd
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Rutas de Transporte - Visualizador</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { width: 100vw; height: 100vh; }
+    .control {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      z-index: 1000;
+      box-shadow: 0 0 5px rgba(0,0,0,0.4);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="control">
+    <label for="lat">Latitud:</label>
+    <input type="number" id="lat" step="0.0001"><br>
+    <label for="lng">Longitud:</label>
+    <input type="number" id="lng" step="0.0001"><br>
+    <button onclick="buscarRutaMasCercana()">Buscar ruta más cercana</button>
+  </div>
+
+  <script>
+    const map = L.map('map').setView([-0.22, -78.52], 12); // Quito como ejemplo
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let rutasEntrada, rutasSalida;
+    let rutaCercanaLayer;
+
+    // Cargar archivos GeoJSON (ajusta las rutas si los colocas en otra carpeta)
+    fetch('data/rutas_entrada.geojson')
+      .then(response => response.json())
+      .then(data => {
+        rutasEntrada = data;
+        L.geoJSON(data, {
+          style: { color: 'blue' }
+        }).addTo(map);
+      });
+
+    fetch('data/rutas_salida.geojson')
+      .then(response => response.json())
+      .then(data => {
+        rutasSalida = data;
+        L.geoJSON(data, {
+          style: { color: 'green' }
+        }).addTo(map);
+      });
+
+    function buscarRutaMasCercana() {
+      const lat = parseFloat(document.getElementById('lat').value);
+      const lng = parseFloat(document.getElementById('lng').value);
+      if (isNaN(lat) || isNaN(lng)) {
+        alert('Ingrese una latitud y longitud válidas');
+        return;
+      }
+
+      const punto = turf.point([lng, lat]);
+      let minDistancia = Infinity;
+      let rutaCercana = null;
+
+      const todasLasRutas = rutasEntrada.features.concat(rutasSalida.features);
+
+      todasLasRutas.forEach(ruta => {
+        const distancia = turf.pointToLineDistance(punto, ruta, {units: 'kilometers'});
+        if (distancia < minDistancia) {
+          minDistancia = distancia;
+          rutaCercana = ruta;
+        }
+      });
+
+      if (rutaCercanaLayer) map.removeLayer(rutaCercanaLayer);
+
+      rutaCercanaLayer = L.geoJSON(rutaCercana, {
+        style: { color: 'red', weight: 5 }
+      }).addTo(map);
+
+      L.marker([lat, lng]).addTo(map)
+        .bindPopup('Ubicación del personal')
+        .openPopup();
+    }
+  </script>
+</body>
+</html>
